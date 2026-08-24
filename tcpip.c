@@ -85,6 +85,17 @@ static u_int x75d_drop_max    = 0;  /* worst single call             */
 static u_int x75d_stale_calls = 0;
 static u_int x75d_stale_total = 0;
 
+/* Without these two, a run of zeroes cannot be told apart from a run
+   that never had the opportunity: with a single socket in the set the
+   highest socket number is trivially also the highest handle, and the
+   nfds computation cannot be wrong.  Only calls with more than one
+   descriptor in the set can produce a drop at all, so that count is the
+   denominator any zero has to be read against.  A new high-water mark
+   is reported the moment it is reached, which also makes it visible
+   straight away whether a load test is doing what it was meant to. */
+static u_int x75d_multi_calls = 0;  /* calls with inset > 1          */
+static u_int x75d_inset_max   = 0;  /* most descriptors seen at once */
+
 static int x75d_pow10 (u_int n) {   /* 1, 10, 100, 1000, ... */
     while ((n >= 10) && ((n % 10) == 0)) n /= 10;
     return (n == 1);
@@ -910,6 +921,13 @@ static void EZASOKET (u_int  func, int  aux1, int  aux2, talk_ptr t) {
 
                 x75d_calls++;
 
+                if (inset > 1) x75d_multi_calls++;
+
+                if ((u_int)inset > x75d_inset_max) {
+                    x75d_inset_max = inset;
+                    if (inset > 1) report = 1;
+                }
+
                 if (dropped) {
                     x75d_drop_calls++;
                     x75d_drop_total += dropped;
@@ -929,9 +947,11 @@ static void EZASOKET (u_int  func, int  aux1, int  aux2, talk_ptr t) {
 
                 if (report)
                     logmsg ("X75SEL calls=%u sock=%d inset=%d maxfd=%d nfds=%d "
-                            "dropped=%d stale=%d | dropcalls=%u droptotal=%u "
-                            "dropmax=%u stalecalls=%u staletotal=%u\n",
+                            "dropped=%d stale=%d | multicalls=%u insetmax=%u "
+                            "dropcalls=%u droptotal=%u dropmax=%u "
+                            "stalecalls=%u staletotal=%u\n",
                             x75d_calls, m, inset, dmaxfd, dnfds, dropped, stale,
+                            x75d_multi_calls, x75d_inset_max,
                             x75d_drop_calls, x75d_drop_total, x75d_drop_max,
                             x75d_stale_calls, x75d_stale_total);
             }
