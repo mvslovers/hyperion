@@ -57,6 +57,41 @@
 
 #include "tcpip.h"
 
+/*-------------------------------------------------------------------*/
+/* NOT FOR MERGE -- diagnostic build only.                           */
+/*                                                                   */
+/* Measures two things about SELECT and changes no behaviour at all:  */
+/*                                                                   */
+/*   dropped  how many of the descriptors the guest asked to watch    */
+/*            fall at or above the nfds this code passes to select(). */
+/*            select() does not look at those, so they never come     */
+/*            back ready and whoever is waiting on them waits.        */
+/*                                                                   */
+/*   stale    how many descriptors in the set no open socket owns any */
+/*            more, because another task closed one after the guest   */
+/*            built its set.  select() fails the whole call on those. */
+/*                                                                   */
+/* Reported on the first occurrence and then at every power of ten,   */
+/* plus one line per 20000 calls so the denominator stays visible.    */
+/*-------------------------------------------------------------------*/
+#define OPTION_X75_SELECT_DIAG
+
+#if defined( OPTION_X75_SELECT_DIAG )
+
+static u_int x75d_calls       = 0;  /* subcode 4 invocations         */
+static u_int x75d_drop_calls  = 0;  /* ... that dropped >= 1 handle  */
+static u_int x75d_drop_total  = 0;  /* handles dropped, all calls    */
+static u_int x75d_drop_max    = 0;  /* worst single call             */
+static u_int x75d_stale_calls = 0;
+static u_int x75d_stale_total = 0;
+
+static int x75d_pow10 (u_int n) {   /* 1, 10, 100, 1000, ... */
+    while ((n >= 10) && ((n % 10) == 0)) n /= 10;
+    return (n == 1);
+}
+
+#endif
+
 static u_int find_slot ( U_LONG_PTR address ) {
     u_int  i;
     i = 0;
@@ -836,6 +871,71 @@ static void EZASOKET (u_int  func, int  aux1, int  aux2, talk_ptr t) {
                 t->ret_cd = -1;
                 return;
             }
+
+#if defined( OPTION_X75_SELECT_DIAG )
+            {
+                int    dfd;
+                int    dslot;
+                int    dnfds;
+                int    dropped = 0;
+                int    stale   = 0;
+                int    inset   = 0;
+                int    dmaxfd  = -1;
+                int    report  = 0;
+
+                /* the nfds this code is about to pass to select() */
+                if ((aux2 >= 1) && (aux2 <= Ccom))
+                    dnfds = Ccom_han [aux2 - 1] + 1;
+                else
+                    dnfds = 0;
+
+                for (dfd = 0; dfd < FD_SETSIZE; dfd++) {
+
+                    if (!FD_ISSET (dfd, (fd_set *)(Cselect [m]->ri))
+                     && !FD_ISSET (dfd, (fd_set *)(Cselect [m]->wi))
+                     && !FD_ISSET (dfd, (fd_set *)(Cselect [m]->ei)))
+                        continue;
+
+                    inset++;
+                    if (dfd > dmaxfd) dmaxfd = dfd;
+
+                    if (dfd >= dnfds) dropped++;
+
+                    for (dslot = 1; dslot < Ccom; dslot++)
+                        if (Ccom_opn [dslot] && Ccom_han [dslot] == dfd) break;
+                    if (dslot == Ccom) stale++;
+                }
+
+                obtain_lock (&tcpip_lock);
+
+                x75d_calls++;
+
+                if (dropped) {
+                    x75d_drop_calls++;
+                    x75d_drop_total += dropped;
+                    if ((u_int)dropped > x75d_drop_max) x75d_drop_max = dropped;
+                    if (x75d_pow10 (x75d_drop_calls)) report = 1;
+                }
+
+                if (stale) {
+                    x75d_stale_calls++;
+                    x75d_stale_total += stale;
+                    if (x75d_pow10 (x75d_stale_calls)) report = 1;
+                }
+
+                if ((x75d_calls % 20000) == 0) report = 1;
+
+                release_lock (&tcpip_lock);
+
+                if (report)
+                    logmsg ("X75SEL calls=%u sock=%d inset=%d maxfd=%d nfds=%d "
+                            "dropped=%d stale=%d | dropcalls=%u droptotal=%u "
+                            "dropmax=%u stalecalls=%u staletotal=%u\n",
+                            x75d_calls, m, inset, dmaxfd, dnfds, dropped, stale,
+                            x75d_drop_calls, x75d_drop_total, x75d_drop_max,
+                            x75d_stale_calls, x75d_stale_total);
+            }
+#endif
 
             timeout.tv_sec = 0;
             timeout.tv_usec = 0;
