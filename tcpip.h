@@ -39,6 +39,8 @@ typedef struct selects_tag * selects_ptr;
 typedef struct selects_tag {
     u_int    len;
     u_int    invalid;
+    u_int    diag_prev_len;  /* DIAGNOSTIC BUILD ONLY: length left behind by
+                                whatever used this socket number before */
     u_int  * ri;
     u_int  * wi;
     u_int  * ei;

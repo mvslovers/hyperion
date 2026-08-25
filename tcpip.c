@@ -101,6 +101,69 @@ static int x75d_pow10 (u_int n) {   /* 1, 10, 100, 1000, ... */
     return (n == 1);
 }
 
+/*-------------------------------------------------------------------*/
+/* Second question, and the one with field evidence behind it.        */
+/*                                                                   */
+/* Select state is kept in Cselect [], indexed by socket number -- the */
+/* guest passes the highest socket of its set as the handle -- so the  */
+/* state belongs to a number, not to the task that is selecting.  The  */
+/* number is handed out again as soon as the socket closes, and CLOSE  */
+/* does not clear the state.  Whoever gets the number next inherits    */
+/* it, including its 'len', which is what decides how many bytes the   */
+/* result subcodes copy back into the guest's buffer.  In FTPD that    */
+/* buffer is a local fd_set, i.e. on the stack.                        */
+/*                                                                   */
+/*   starts          subcode 0 (Start) invocations                     */
+/*   reuse           ... that found state already there.  Subcode 8    */
+/*                   frees it, so this means the previous run never    */
+/*                   got that far, or another one is in progress on    */
+/*                   the same number.                                  */
+/*   lenchange       a run whose bitmap length differs from the one    */
+/*                   left behind: the case where a stale length would  */
+/*                   write the wrong number of bytes.                  */
+/*   closewithstate  CLOSE on a socket that still has select state.    */
+/*   nostate         a subcode other than Start arriving with no state */
+/*                   at all -- today that is a NULL dereference.       */
+/*-------------------------------------------------------------------*/
+static u_int x75d_starts      = 0;
+static u_int x75d_reuse       = 0;
+static u_int x75d_lenchange   = 0;
+static u_int x75d_closestate  = 0;
+static u_int x75d_nostate     = 0;
+
+static void x75d_check_len (selects_ptr sel, u_int len_in, int sock);
+
+static void x75d_report2 (const char * what, int sock) {
+    logmsg ("X75SEL2 %-14s sock=%d | starts=%u reuse=%u lenchange=%u "
+            "closewithstate=%u nostate=%u\n",
+            what, sock, x75d_starts, x75d_reuse, x75d_lenchange,
+            x75d_closestate, x75d_nostate);
+}
+
+/* Called from the first input subcode of a run that inherited state: does
+   this run even have the same bitmap length as whatever was left behind?
+   If not, the inherited length is the one the result subcodes would have
+   used to decide how much to write back into the guest's buffer. */
+static void x75d_check_len (selects_ptr sel, u_int len_in, int sock) {
+
+    if (sel->diag_prev_len == 0) return;    /* nothing was inherited */
+
+    if (len_in != sel->diag_prev_len) {
+
+        obtain_lock (&tcpip_lock);
+        x75d_lenchange++;
+        release_lock (&tcpip_lock);
+
+        logmsg ("X75SEL2 LEN-CHANGE     sock=%d inherited=%u now=%u\n",
+                sock, sel->diag_prev_len, len_in);
+
+        if (x75d_pow10 (x75d_lenchange))
+            x75d_report2 ("LEN-CHANGE-SUM", sock);
+    }
+
+    sel->diag_prev_len = 0;                 /* only the first one per run */
+}
+
 #endif
 
 static u_int find_slot ( U_LONG_PTR address ) {
@@ -666,6 +729,16 @@ static void EZASOKET (u_int  func, int  aux1, int  aux2, talk_ptr t) {
     case 12: /* CLOSE */
 
         if ((aux1 > 0) && (aux1 < Ccom)) {
+
+#if defined( OPTION_X75_SELECT_DIAG )
+            if (Cselect [aux1] != NULL) {
+                obtain_lock (&tcpip_lock);
+                x75d_closestate++;
+                release_lock (&tcpip_lock);
+                if (x75d_pow10 (x75d_closestate))
+                    x75d_report2 ("CLOSE-W-STATE", aux1);
+            }
+#endif
             /* close connection */
             if (Ccom_opn [aux1])
                 closesocket (Ccom_han [aux1]);
@@ -768,8 +841,43 @@ static void EZASOKET (u_int  func, int  aux1, int  aux2, talk_ptr t) {
 
         if (check_not_sock (m, t)) return;
 
+#if defined( OPTION_X75_SELECT_DIAG )
+        /* Every subcode but Start works on state Start created.  Without
+           state there is nothing to work on, and the unguarded code would
+           dereference NULL -- count it and fail the call instead, so the
+           measurement run cannot be ended by the very thing it measures. */
+        if (((aux1 & 0xFF) >= 1) && ((aux1 & 0xFF) <= 7) && (Cselect [m] == NULL)) {
+
+            obtain_lock (&tcpip_lock);
+            x75d_nostate++;
+            release_lock (&tcpip_lock);
+
+            if (x75d_pow10 (x75d_nostate))
+                x75d_report2 ("NO-STATE", m);
+
+            t->ret_cd = -1;
+            return;
+        }
+#endif
+
         switch (aux1 & 0xFF) {
         case 0:  /* Start */
+
+#if defined( OPTION_X75_SELECT_DIAG )
+            obtain_lock (&tcpip_lock);
+            x75d_starts++;
+            if (Cselect [m] != NULL) x75d_reuse++;
+            release_lock (&tcpip_lock);
+
+            if (Cselect [m] != NULL) {
+                /* remember what the previous user left behind, so the first
+                   input subcode can say whether this run is even the same
+                   shape as the state it inherited */
+                Cselect [m]->diag_prev_len = Cselect [m]->len;
+                if (x75d_pow10 (x75d_reuse))
+                    x75d_report2 ("START-REUSE", m);
+            }
+#endif
             if (Cselect [m] == NULL) { /* Start-part */
 
                 Cselect [m] = malloc (sizeof (selects));
@@ -781,6 +889,10 @@ static void EZASOKET (u_int  func, int  aux1, int  aux2, talk_ptr t) {
                 Cselect [m]->ro = malloc (sizeof (fd_set));
                 Cselect [m]->wo = malloc (sizeof (fd_set));
                 Cselect [m]->eo = malloc (sizeof (fd_set));
+
+#if defined( OPTION_X75_SELECT_DIAG )
+                Cselect [m]->diag_prev_len = 0;  /* nothing was inherited */
+#endif
             }
 
             FD_ZERO ((fd_set *)(Cselect [m]->ri));
@@ -795,6 +907,9 @@ static void EZASOKET (u_int  func, int  aux1, int  aux2, talk_ptr t) {
 
         case 1:  /* Read Inputs */
 
+#if defined( OPTION_X75_SELECT_DIAG )
+            x75d_check_len (Cselect [m], t->len_in, m);
+#endif
             Cselect [m]->len = t->len_in; /* Copy every time... */
 
             /* Need to bswap every long in the incoming array... */
@@ -821,6 +936,9 @@ static void EZASOKET (u_int  func, int  aux1, int  aux2, talk_ptr t) {
 
         case 2:  /* Write Inputs */
 
+#if defined( OPTION_X75_SELECT_DIAG )
+            x75d_check_len (Cselect [m], t->len_in, m);
+#endif
             Cselect [m]->len = t->len_in; /* Copy every time... */
 
             /* Need to bswap every long in the incoming array... */
@@ -847,6 +965,9 @@ static void EZASOKET (u_int  func, int  aux1, int  aux2, talk_ptr t) {
 
         case 3:  /* Exception Inputs */
 
+#if defined( OPTION_X75_SELECT_DIAG )
+            x75d_check_len (Cselect [m], t->len_in, m);
+#endif
             Cselect [m]->len = t->len_in; /* Copy every time... */
 
             /* Need to bswap every long in the incoming array... */
