@@ -746,6 +746,24 @@ static void EZASOKET (u_int  func, int  aux1, int  aux2, talk_ptr t) {
             Ccom_opn [aux1] = 0;
             Ccom_han [aux1] = -1;
             Ccom_blk [aux1] = 1;
+
+            /* THE FIX UNDER TEST: the select state goes with the socket.
+               The counter above still fires, because the event it counts
+               still happens -- what must change is what comes after it, so
+               'reuse' has to stay at zero from here on. */
+            if (Cselect [aux1] != NULL) {
+
+                free (Cselect [aux1]->ri);
+                free (Cselect [aux1]->wi);
+                free (Cselect [aux1]->ei);
+
+                free (Cselect [aux1]->ro);
+                free (Cselect [aux1]->wo);
+                free (Cselect [aux1]->eo);
+
+                free (Cselect [aux1]);
+                Cselect [aux1] = NULL;
+            }
         }
 
         t->ret_cd = 0;
