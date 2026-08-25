@@ -627,6 +627,29 @@ static void EZASOKET (u_int  func, int  aux1, int  aux2, talk_ptr t) {
             Ccom_opn [aux1] = 0;
             Ccom_han [aux1] = -1;
             Ccom_blk [aux1] = 1;
+
+            /* The select state goes with the socket.  It is keyed by socket
+               number -- the guest hands in the highest socket of its set as
+               the handle -- so it belongs to a number rather than to the
+               task that is selecting, and the number is free for immediate
+               re-use the moment this returns.  Left behind, it outlives both
+               the socket and the address space that created it, and is
+               inherited by whichever unrelated task is handed that number
+               next.  A run that never reaches Finish -- its task cancelled,
+               or its socket closed under it -- leaks the state outright. */
+            if (Cselect [aux1] != NULL) {
+
+                free (Cselect [aux1]->ri);
+                free (Cselect [aux1]->wi);
+                free (Cselect [aux1]->ei);
+
+                free (Cselect [aux1]->ro);
+                free (Cselect [aux1]->wo);
+                free (Cselect [aux1]->eo);
+
+                free (Cselect [aux1]);
+                Cselect [aux1] = NULL;
+            }
         }
 
         t->ret_cd = 0;
@@ -721,6 +744,27 @@ static void EZASOKET (u_int  func, int  aux1, int  aux2, talk_ptr t) {
         m = func >> 16;
 
         if (check_not_sock (m, t)) return;
+
+        /* One guest select() is a run of subcodes, and every subcode but
+           Start works on the state Start created.  Now that CLOSE clears
+           that state, a run whose socket is closed under it finds nothing
+           left -- and so does a run on a socket number that has since been
+           handed to somebody else.  Fail the call rather than dereference
+           NULL.  Finish is left out: it copes with NULL by design, and the
+           guest issues it unconditionally at the end of every run.
+
+           This is not a new answer for the guest.  check_not_sock above
+           already returns -1 for every subcode once the socket is gone, so
+           existing guest code handles -1 from mid-select today; the only
+           change is that it now also arrives when the number was re-used,
+           where the run would otherwise continue on somebody else's state.
+           Only ret_cd is set, no Cerr [m], for the same reason
+           check_not_sock leaves it alone: the slot may not be ours. */
+        if (((aux1 & 0xFF) >= 1) && ((aux1 & 0xFF) <= 7) && (Cselect [m] == NULL)) {
+
+            t->ret_cd = -1;
+            return;
+        }
 
         switch (aux1 & 0xFF) {
         case 0:  /* Start */
