@@ -66,6 +66,25 @@
 #include "tcpip.h"
 #include "x75.h"
 
+/*-------------------------------------------------------------------*/
+/* Diagnostic build: count and log instruction restarts.             */
+/*                                                                   */
+/* Every issuer of X'75' zeroes R0 (SLR 0,0) before the instruction  */
+/* and nothing but this instruction ever sets it non-zero, so entry  */
+/* with GR_L(0) != 0 is exactly a restart after a nullifying         */
+/* exception on the guest buffer. lar_offset () says how many bytes  */
+/* the copy had already moved when it was nullified: anything above  */
+/* zero is a transfer that an unfixed emulator is about to replay    */
+/* from the start of the host buffer.                                */
+/*                                                                   */
+/* Not for production: this branch exists to be measured with, and   */
+/* the define is therefore active. The counters are per architecture */
+/* because this file is compiled once per arch; only the one the     */
+/* guest runs in will move.                                          */
+/*-------------------------------------------------------------------*/
+
+#define X75_TRACE_RESTART
+
 #if defined( FEATURE_TCPIP_EXTENSION )
 /*-------------------------------------------------------------------*/
 /* 75xx TCPIP Ra,yyy(Rb,Rc) Ra=anything, Rc>4<14, Rb=0/ditto  [RX-a] */
@@ -88,6 +107,22 @@ DEF_INST( tcpip )
     UNREFERENCED(r1);
 
     if (!FACILITY_ENABLED( HERC_TCPIP_PROB_STATE, regs )) PRIV_CHECK(regs);
+
+#if defined( X75_TRACE_RESTART )
+    if (regs->GR_L(0) != 0) {
+        static U64 restarts = 0;
+        static U64 partials = 0;
+        unsigned int done   = lar_offset (&(regs->gr [0]));
+
+        restarts++;
+        if (done != 0) partials++;
+
+        logmsg ("X75 restart %"PRIu64" (%"PRIu64" after a completed segment):"
+                " dir=%u left=%u done=%u talk=%u\n",
+                restarts, partials, regs->GR_L(3), regs->GR_L(1), done,
+                regs->GR_L(14));
+    }
+#endif
 
     if (regs->GR_L(0) == 0) { /* Only run when R0 = 0, (restart) */
 
