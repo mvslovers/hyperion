@@ -12,20 +12,48 @@ evidence.
 | BIND sets `SO_REUSEADDR` | `837f2f29` | #869 / PR #870, merged |
 | SELECT state dies with its socket | `60dd927e` | #874 / PR #875, merged |
 
-The build on `mvsdev` is `4.10.0.11739-SDL-DEV-g60dd927e`, dated 25 Aug 2026.
-It carries everything in that table and nothing below it -- in particular not
-the restart fix, which has never been compiled or run anywhere.
+## Measured, not yet proposed upstream: a restarted copy replays the host buffer
 
-## Open: a restarted copy replays the host buffer from its start
-
-Fix written and committed on the fork, not yet built, measured or proposed
-upstream:
+Reproduced on demand and fixed, both measured on `mvsdev` (MVS/CE, MVS 3.8j) on
+3 Sep 2026:
 
 | Branch | Commit | What it is |
 |---|---|---|
 | `fix/x75-restart-resume` | `fcf7d15d` | the fix alone, the form to propose upstream |
 | `diag/x75-restart-trace` | `f1f1f9d1` | red: instrumentation and `lar_offset ()`, no fix |
 | `diag/x75-restart-trace` | `392c22c6` | green: the same, one line further |
+
+The probe is mvslovers/libc370 `test/mvs/tst75rst.c` + `jcl/tst75rst.jcl`. It
+places a page boundary at a chosen multiple of 256 inside a 1024-byte receive
+buffer and releases the page beyond it with `PGRLSE` immediately before the
+receive, over a loopback pair it owns both ends of.
+
+| Case | red `done` | red `first_bad` | green `done` | green `first_bad` |
+|---|---|---|---|---|
+| boundary 0 (control) | 0 | none | 0 | none |
+| boundary 256 | 256 | **256** | 256 | none |
+| boundary 512 | 512 | **512** | 512 | none |
+| boundary 768 | 768 | **768** | 768 | none |
+
+Red `JOB03045` RC=8 under `gf1f1f9d1`, green `JOB03046` RC=0 under `g392c22c6`.
+
+Two things make this evidence rather than a clean run. First, the emulator's
+`done` is exactly the guest's `first_bad` in every red case, and the tail is a
+clean replay of the host buffer from its start -- the mechanism named, not just
+a mismatch observed. Second, and the reason the trace has to stay in across
+both halves: **the three restarts after a completed segment still happen under
+green**, with the same `done` values. The fault rate did not move; only the
+resume path did. Restarts disappearing would have proved nothing.
+
+The control is the guard on the other side. A fault at offset 0 restarts having
+copied nothing, which is correct on both builds, and it is clean on both.
+
+One trap cost a cycle and is worth keeping written down: the first red run
+passed all four cases because `PGRLSE` had released nothing. Its high address
+must be the first byte **beyond** the page -- it rounds inward, so
+`hi = page + 4095` makes the range empty. **`R15` is 0 either way**, so only
+reading the page back detects it. The probe now chooses the convention by
+probing both and refuses to run the receive cases if neither releases.
 
 ### What the defect is
 
@@ -210,14 +238,19 @@ So no guest may drop its workaround on the strength of this change, and the
 correct guest-side cap -- 256, not 4096 -- is permanent regardless
 (mvslovers/libc370, `@@75recv.c`).
 
-### How we will test it
+### How it was tested
+
+*(Done -- the results are in the table at the top of this section. What follows
+is the method and the reasoning behind it, kept because it is what makes the
+numbers mean anything.)*
 
 From the emulator, not the guest, and it is a counter rather than a reproducer.
 The guest issues `SLR 0,0` before every X'75' and only this instruction ever
 sets R0 non-zero, so **entry to `DEF_INST( tcpip )` with `GR_L(0) != 0` is
 exactly a restart**. Log R0, R1 and R3 there: a restart with R1 below the
 original transfer length is a corruption that has just happened, not one
-inferred.
+inferred. That held in practice -- the only restarts seen outside the probe
+were mvsmf's byte-at-a-time reads, reporting `left=1 done=0`.
 
 The instrumentation has to stay in place across both sides of the change,
 because the result that confirms the fix is **restarts still happening, with no
@@ -264,13 +297,23 @@ measures nothing either.
 
 **Guest side**: mvslovers/libc370, `test/mvs/tst75rst.c` and `jcl/tst75rst.jcl`.
 It places a page boundary at a chosen multiple of 256 inside a 1024-byte recv
-buffer and makes the page beyond it non-resident immediately before the recv --
-by `PGRLSE` (SVC 112), and in a second case simply by never referencing it. The
-segments below the boundary complete, the one at it faults, and an unfixed
-emulator copies the remainder from `host[0]`. The recv goes through `__75 ()`
-rather than `recv ()` so that one measurement is one pair of instructions, with
-no retry loop to blur it. The byte pattern is `i % 251`: any period dividing
-256 would make a replay starting at a multiple of 256 invisible.
+buffer and releases the page beyond it with `PGRLSE` (SVC 112) immediately
+before the recv. The segments below the boundary complete, the one at it
+faults, and an unfixed emulator copies the remainder from `host[0]`. The recv
+goes through `__75 ()` rather than `recv ()` so that one measurement is one pair
+of instructions, with no retry loop to blur it. The byte pattern is `i % 251`:
+any period dividing 256 would make a replay starting at a multiple of 256
+invisible. The peer sends in 256-byte chunks, because SEND has the mirror
+defect and no cap at all -- a single 1024-byte send could corrupt the data on
+its way out and be misread as a receive-side failure.
+
+The probe verifies `PGRLSE` before opening a socket, and that check is not
+ceremony: it caught the first red run passing all four cases while releasing
+nothing. The high address must be the first byte **beyond** the page, since
+`PGRLSE` rounds inward, and **`R15` is 0 for both forms** -- only reading the
+page back tells them apart. A no-op there is indistinguishable from a fixed
+emulator, so the probe now tries both conventions and refuses to run the
+receive cases if neither releases.
 
 The two sides are needed together. R0 comes back as `1` either way, so the
 guest cannot see a restart, and a clean run has two causes -- fixed, or never
