@@ -78,10 +78,15 @@ changes nothing until it is installed:
 
 ```sh
 cd ~/hercules/hyperion/build && sudo make install
+sudo chmod 4755 /usr/local/hercules/bin/hercifc
 ```
 
-**Ask Mike to run it**; do not try to. Then MVSCE has to be stopped and
-restarted for the new binary to take effect.
+**Ask Mike to run both**; do not try to. `make install` does not leave the
+setuid bit on `hercifc`, and without it the network interface helper cannot
+configure tun/tap — so the `chmod` belongs to every install, not just the first.
+
+Then MVSCE has to be stopped and restarted for the new binary to take effect;
+replacing the file underneath a running emulator leaves it on the old inode.
 
 ### Verify what is actually running — every time
 
