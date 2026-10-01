@@ -1,0 +1,24 @@
+# Guest: SIO a READ INQUIRY to 009, enabled-wait for the interrupt, repeat
+# N times, then disabled wait 0x600D.  SIO cc != 0 -> disabled wait 0xBAD.
+r 000=0000000000000200
+r 048=00000300
+r 078=0000000000000220
+r 200=41F000009C0000094770025082000280
+r 220=41F0F00159F0029047B0024047F00204
+r 240=82000288
+r 250=82000298
+r 280=FE02000000000000000200000000600D
+r 290=@N@
+r 298=0002000000000BAD
+r 300=0A00040020000050
+hao tgt input for console 0:0009
+hao cmd @CMD@
+restart
+pause @SECS@
+lsmod
+ipending
+devlist
+psw
+r 290.4
+r 400.4
+quit

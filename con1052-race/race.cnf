@@ -1,0 +1,6 @@
+# con1052c READ INQUIRY lost-wakeup repro -- no MVS, no DASD
+ARCHLVL   S/370
+MAINSIZE  1
+NUMCPU    1
+CNSLPORT  13299
+0009 3215-C /
