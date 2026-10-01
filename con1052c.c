@@ -22,6 +22,7 @@
 /*                 Tweakable build constants                         */
 /*-------------------------------------------------------------------*/
 #define BUFLEN_1052     150             /* 1052 Send/Receive buffer  */
+#define CON1052_RACE_DELAY_US 200000  /* DIAGNOSTIC: prompt-to-wait gap */
 
 /*-------------------------------------------------------------------*/
 /*                     Forward reference                             */
@@ -431,6 +432,8 @@ BYTE    c;                              /* Print character           */
             if (dev->prompt1052)
                 // "Enter '%s' input for console %1d:%04X"
                 WRMSG( HHC00010, "A", dev->filename, LCSS_DEVNUM );
+
+            USLEEP( CON1052_RACE_DELAY_US );   /* DIAGNOSTIC: widen the window */
 
             OBTAIN_DEVLOCK( dev );
             {
