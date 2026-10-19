@@ -1,0 +1,6 @@
+# #892 repro -- attention-driven reader, no MVS, no DASD
+ARCHLVL   S/370
+MAINSIZE  1
+NUMCPU    1
+CNSLPORT  13298
+0009 3215-C /
