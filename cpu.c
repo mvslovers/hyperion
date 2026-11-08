@@ -1699,7 +1699,7 @@ void (ATTR_REGPARM(1) ARCH_DEP(process_interrupt))(REGS *regs)
     /* Obtain the interrupt lock */
     OBTAIN_INTLOCK(regs);
     OFF_IC_INTERRUPT(regs);
-    regs->breakortrace = (sysblk.instbreak || (sysblk.insttrace && regs->insttrace));
+    regs->breakortrace = (sysblk.instbreak || sysblk.oracle || (sysblk.insttrace && regs->insttrace));
 
     /* Ensure psw.IA is set and invalidate the aia */
     INVALIDATE_AIA(regs);
@@ -1981,7 +1981,7 @@ int     aswitch;
 
     regs->program_interrupt = &ARCH_DEP(program_interrupt);
 
-    regs->breakortrace = (sysblk.instbreak || (sysblk.insttrace && regs->insttrace));
+    regs->breakortrace = (sysblk.instbreak || sysblk.oracle || (sysblk.insttrace && regs->insttrace));
     regs->ints_state |= sysblk.ints_state;
 
     /* Establish longjmp destination for cpu thread exit */
@@ -2192,12 +2192,25 @@ enter_txf_slower_loop:
 void ARCH_DEP( process_trace )( REGS* regs, BYTE* dest )
 {
     bool shouldtrace = false;           /* true == Trace instruction */
+    bool oraclestop  = false;           /* true == Oracle step done  */
+
+    /* Oracle shim stepping: execute the instruction while steps are
+       left, otherwise stop quietly before it (see oracle.c) */
+    if (sysblk.oracle)
+    {
+        if (regs->oracle_steps)
+        {
+            regs->oracle_steps--;
+            return;
+        }
+        oraclestop = true;
+    }
 
     /* Test for trace */
     shouldtrace = CPU_TRACING( regs, 0 );
 
     /* Test for step */
-    regs->stepping = CPU_STEPPING( regs, 0 );
+    regs->stepping = CPU_STEPPING( regs, 0 ) && !oraclestop;
 
     if (regs->stepping)
     {
@@ -2213,7 +2226,7 @@ void ARCH_DEP( process_trace )( REGS* regs, BYTE* dest )
         ARCH_DEP( display_inst )( regs, dest );
 
     /* Stop the CPU if instruction stepping */
-    if (regs->stepping)
+    if (regs->stepping || oraclestop)
     {
         REGS* hostregs = HOSTREGS;
         S64 saved_timer[2] = {0};
@@ -2249,6 +2262,17 @@ void ARCH_DEP( process_trace )( REGS* regs, BYTE* dest )
             hostregs->waittod = 0;
         }
         RELEASE_INTLOCK( hostregs );
+
+        /* After an oracle stop the shim may have replaced the CPU
+           state, storage or even the architecture mode. Restart the
+           instruction loop instead of executing the instruction that
+           was fetched before the stop. */
+        if (oraclestop)
+        {
+            if (sysblk.arch_mode != regs->arch_mode)
+                longjmp( regs->archjmp, SIE_NO_INTERCEPT );
+            longjmp( regs->progjmp, SIE_NO_INTERCEPT );
+        }
     }
 } /* process_trace */
 

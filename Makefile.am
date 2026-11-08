@@ -100,6 +100,7 @@ endif
 dynamic_SRC = \
   dyncrypt.c  \
   dyngui.c    \
+  oracle.c    \
   hdteq.c
 
 dyndev_SRC =  \
@@ -189,6 +190,7 @@ HERCLIBS2 =     \
 HERCMODS =      \
   dyncrypt.la   \
   dyngui.la     \
+  oracle.la     \
   hdteq.la      \
   hdtptp.la     \
   hdtqeth.la    \
@@ -277,6 +279,10 @@ dyncrypt_la_LIBADD  = $(DYNMOD_LD_ADD)
 dyngui_la_SOURCES   = dyngui.c
 dyngui_la_LDFLAGS   = $(DYNMOD_LD_FLAGS)
 dyngui_la_LIBADD    = $(DYNMOD_LD_ADD)
+
+oracle_la_SOURCES   = oracle.c
+oracle_la_LDFLAGS   = $(DYNMOD_LD_FLAGS)
+oracle_la_LIBADD    = $(DYNMOD_LD_ADD)
 
 hdteq_la_SOURCES    = hdteq.c
 hdteq_la_LDFLAGS    = $(DYNMOD_LD_FLAGS)

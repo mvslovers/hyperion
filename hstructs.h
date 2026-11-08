@@ -275,6 +275,9 @@ struct REGS {                           /* Processor registers       */
                 sigp_reset:1,           /* 1=SIGP cpu reset received */
                 sigp_ini_reset:1;       /* 1=SIGP initial cpu reset  */
 
+        U64     oracle_steps;           /* Oracle shim: instructions
+                                           left before the CPU stops */
+
         CACHE_ALIGN
         S64     tod_epoch;              /* TOD epoch for this CPU    */
         TOD     clkc;                   /* 0-7=Clock comparator epoch,
@@ -1021,6 +1024,7 @@ atomic_update64( &sysblk.txf_stats[ contran ? 1 : 0 ].txf_ ## ctr, +1 )
 #endif
                 sigintreq:1,            /* 1 = SIGINT request pending*/
                 insttrace:1,            /* 1 = Inst trace enabled    */
+                oracle:1,               /* 1 = Oracle shim stepping  */
                 tfnostop:1,             /* 1 = tf continue tracing   */
                 instbreak:1,            /* 1 = Inst break enabled    */
                 shutbegin:1,            /* 1 = shutdown begin req    */

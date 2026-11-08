@@ -187,6 +187,12 @@ dyngui_la_OBJECTS = $(am_dyngui_la_OBJECTS)
 dyngui_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(dyngui_la_LDFLAGS) $(LDFLAGS) -o $@
+oracle_la_DEPENDENCIES = $(am__DEPENDENCIES_2)
+am_oracle_la_OBJECTS = oracle.lo
+oracle_la_OBJECTS = $(am_oracle_la_OBJECTS)
+oracle_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(oracle_la_LDFLAGS) $(LDFLAGS) -o $@
 hdt1052c_la_DEPENDENCIES = $(am__DEPENDENCIES_2)
 am_hdt1052c_la_OBJECTS = con1052c.lo
 hdt1052c_la_OBJECTS = $(am_hdt1052c_la_OBJECTS)
@@ -661,7 +667,7 @@ am__depfiles_remade = ./$(DEPDIR)/_archdep_templ.Plo \
 	./$(DEPDIR)/dfp.Plo ./$(DEPDIR)/diagmssf.Plo \
 	./$(DEPDIR)/diagnose.Plo ./$(DEPDIR)/dmap2hrc.Po \
 	./$(DEPDIR)/dummydev.Plo ./$(DEPDIR)/dyn76.Plo \
-	./$(DEPDIR)/dyncrypt.Plo ./$(DEPDIR)/dyngui.Plo \
+	./$(DEPDIR)/dyncrypt.Plo ./$(DEPDIR)/dyngui.Plo ./$(DEPDIR)/oracle.Plo \
 	./$(DEPDIR)/ecpsvm.Plo ./$(DEPDIR)/esame.Plo \
 	./$(DEPDIR)/external.Plo ./$(DEPDIR)/facility.Plo \
 	./$(DEPDIR)/faketape.Plo ./$(DEPDIR)/fbadasd.Plo \
@@ -738,7 +744,7 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(dyncrypt_la_SOURCES) $(dyngui_la_SOURCES) \
+SOURCES = $(dyncrypt_la_SOURCES) $(dyngui_la_SOURCES) $(oracle_la_SOURCES) \
 	$(hdt1052c_la_SOURCES) $(hdt1403_la_SOURCES) \
 	$(hdt2703_la_SOURCES) $(hdt2880_la_SOURCES) \
 	$(hdt3088_la_SOURCES) $(hdt3270_la_SOURCES) \
@@ -765,7 +771,7 @@ SOURCES = $(dyncrypt_la_SOURCES) $(dyngui_la_SOURCES) \
 	$(hetupd_SOURCES) $(maketape_SOURCES) $(tapecopy_SOURCES) \
 	$(tapemap_SOURCES) $(tapesplt_SOURCES) $(tfprint_SOURCES) \
 	$(tfswap_SOURCES) $(txt2card_SOURCES) $(vmfplc2_SOURCES)
-DIST_SOURCES = $(dyncrypt_la_SOURCES) $(dyngui_la_SOURCES) \
+DIST_SOURCES = $(dyncrypt_la_SOURCES) $(dyngui_la_SOURCES) $(oracle_la_SOURCES) \
 	$(hdt1052c_la_SOURCES) $(hdt1403_la_SOURCES) \
 	$(hdt2703_la_SOURCES) $(hdt2880_la_SOURCES) \
 	$(hdt3088_la_SOURCES) $(hdt3270_la_SOURCES) \
@@ -1110,6 +1116,7 @@ fthreads_SRC = fthreads.c
 dynamic_SRC = \
   dyncrypt.c  \
   dyngui.c    \
+  oracle.c    \
   hdteq.c
 
 dyndev_SRC = \
@@ -1197,6 +1204,7 @@ HERCLIBS2 = \
 HERCMODS = \
   dyncrypt.la   \
   dyngui.la     \
+  oracle.la     \
   hdteq.la      \
   hdtptp.la     \
   hdtqeth.la    \
@@ -1233,6 +1241,9 @@ dyncrypt_la_LIBADD = $(DYNMOD_LD_ADD)
 dyngui_la_SOURCES = dyngui.c
 dyngui_la_LDFLAGS = $(DYNMOD_LD_FLAGS)
 dyngui_la_LIBADD = $(DYNMOD_LD_ADD)
+oracle_la_SOURCES = oracle.c
+oracle_la_LDFLAGS = $(DYNMOD_LD_FLAGS)
+oracle_la_LIBADD = $(DYNMOD_LD_ADD)
 hdteq_la_SOURCES = hdteq.c
 hdteq_la_LDFLAGS = $(DYNMOD_LD_FLAGS)
 hdteq_la_LIBADD = $(DYNMOD_LD_ADD)
@@ -2218,6 +2229,8 @@ dyncrypt.la: $(dyncrypt_la_OBJECTS) $(dyncrypt_la_DEPENDENCIES) $(EXTRA_dyncrypt
 
 dyngui.la: $(dyngui_la_OBJECTS) $(dyngui_la_DEPENDENCIES) $(EXTRA_dyngui_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(dyngui_la_LINK) -rpath $(modexecdir) $(dyngui_la_OBJECTS) $(dyngui_la_LIBADD) $(LIBS)
+oracle.la: $(oracle_la_OBJECTS) $(oracle_la_DEPENDENCIES) $(EXTRA_oracle_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(oracle_la_LINK) -rpath $(modexecdir) $(oracle_la_OBJECTS) $(oracle_la_LIBADD) $(LIBS)
 
 hdt1052c.la: $(hdt1052c_la_OBJECTS) $(hdt1052c_la_DEPENDENCIES) $(EXTRA_hdt1052c_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(hdt1052c_la_LINK) -rpath $(modexecdir) $(hdt1052c_la_OBJECTS) $(hdt1052c_la_LIBADD) $(LIBS)
@@ -2535,6 +2548,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dyn76.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dyncrypt.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dyngui.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/oracle.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ecpsvm.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/esame.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/external.Plo@am__quote@ # am--include-marker
@@ -3142,6 +3156,7 @@ distclean: distclean-recursive
 	-rm -f ./$(DEPDIR)/dyn76.Plo
 	-rm -f ./$(DEPDIR)/dyncrypt.Plo
 	-rm -f ./$(DEPDIR)/dyngui.Plo
+	-rm -f ./$(DEPDIR)/oracle.Plo
 	-rm -f ./$(DEPDIR)/ecpsvm.Plo
 	-rm -f ./$(DEPDIR)/esame.Plo
 	-rm -f ./$(DEPDIR)/external.Plo
@@ -3383,6 +3398,7 @@ maintainer-clean: maintainer-clean-recursive
 	-rm -f ./$(DEPDIR)/dyn76.Plo
 	-rm -f ./$(DEPDIR)/dyncrypt.Plo
 	-rm -f ./$(DEPDIR)/dyngui.Plo
+	-rm -f ./$(DEPDIR)/oracle.Plo
 	-rm -f ./$(DEPDIR)/ecpsvm.Plo
 	-rm -f ./$(DEPDIR)/esame.Plo
 	-rm -f ./$(DEPDIR)/external.Plo
