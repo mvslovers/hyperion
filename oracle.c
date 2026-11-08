@@ -110,7 +110,8 @@ static void ARCH_DEP( oracle_get_state )( REGS* regs, BYTE* b )
 
     STORE_DW( b + 480, (U64) regs->PX );
     STORE_DW( b + 488, (U64) get_cpu_timer( regs ));
-    STORE_DW( b + 496, (U64) regs->clkc );
+    /* Hercules keeps the clock comparator shifted right by 8 bits */
+    STORE_DW( b + 496, (U64) regs->clkc << 8 );
 }
 
 /*-------------------------------------------------------------------*/
@@ -157,7 +158,7 @@ static int ARCH_DEP( oracle_set_state )( REGS* regs, BYTE* b )
     regs->psa = (PSA_3XX*)(regs->mainstor + regs->PX);
 
     set_cpu_timer( regs, (S64) fetch_dw( b + 488 ));
-    regs->clkc = fetch_dw( b + 496 );
+    regs->clkc = fetch_dw( b + 496 ) >> 8;
 
     /* PSW last, so that its checks see the new control registers */
     if ((rc = ARCH_DEP( load_psw )( regs, b + 8 )) != 0)
