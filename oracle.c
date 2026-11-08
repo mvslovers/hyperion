@@ -227,6 +227,9 @@ static int ARCH_DEP( oracle_set_state )( REGS* regs, BYTE* b )
 #define STOP_STOPPED        2
 #define STOP_TIMEOUT        3
 
+/* STEP flags */
+#define STEP_THROUGH_ENABLED_WAIT  0x00000001  /* wait for interruptions */
+
 /* Storage key bits exchanged on the wire (ACC F R C) */
 #define ORACLE_KEY_MASK     (STORKEY_KEY | STORKEY_FETCH | STORKEY_REF | STORKEY_CHANGE)
 
@@ -663,11 +666,14 @@ static bool do_step( int fd, BYTE* p, U32 n )
     U64   left  = 0;
     BYTE  why   = STOP_COUNT;
     U64   waited_us = 0;
+    U32   flags = 0;
 
     if (n < 12)
         return send_error( fd, ERR_MALFORMED, "short STEP" );
     count      = fetch_dw( p );
     timeout_ms = fetch_fw( p + 8 );
+    if (n >= 16)
+        flags  = fetch_fw( p + 12 );
 
     if (!sysblk.oracle)
         return send_error( fd, ERR_STATE, "RESET required before STEP" );
@@ -708,7 +714,9 @@ static bool do_step( int fd, BYTE* p, U32 n )
                         why = STOP_STOPPED;
                 }
                 else if (regs->cpustate == CPUSTATE_STARTED
-                      && WAITSTATE( &regs->psw ))
+                      && WAITSTATE( &regs->psw )
+                      && (!(flags & STEP_THROUGH_ENABLED_WAIT)
+                          || IS_IC_DISABLED_WAIT_PSW( regs )))
                 {
                     finished = true;
                     left     = regs->oracle_steps;
