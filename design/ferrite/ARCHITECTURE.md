@@ -1,9 +1,28 @@
 # Ferrite — Architecture Overview
 
-> **Status:** Draft 0.1 — design discussion, nothing implemented yet.
-> **Working title:** *Ferrite* (iron oxide = rust; ferrite cores = the core
-> storage of the machines we emulate). Subject to change.
+> **Status:** Draft 0.2 — design discussion, nothing implemented yet.
 > **License:** MIT (everything: emulator, test suite, macros, tools).
+
+---
+
+## 0. Why "Ferrite"?
+
+The name ties together the three worlds this project lives in:
+
+- **Big Iron.** Mainframes have been called *big iron* for decades — the
+  large, heavy, iron-framed machines that filled raised-floor computer rooms,
+  first and foremost those from *Big Blue*. Ferrite is, literally, iron.
+- **Core storage.** The main storage of the early systems this project starts
+  with was built from **ferrite cores**: tiny magnetic rings threaded on wire
+  grids. On many System/360 and early System/370 machines "core" *was* main
+  storage, and the term survives to this day in *core image*, *core dump* and
+  *low core*.
+- **Rust.** Ferrite is an iron oxide — and the emulator is written in
+  **Rust**. Iron that has oxidised is rust; a mainframe rebuilt in Rust is,
+  in a sense, ferrite.
+
+Old iron, the cores that held its programs, and the language used to bring
+it back to life — one word for all three.
 
 ---
 
@@ -509,7 +528,7 @@ possible as a separate hobby project.
 
 | # | Topic | Options / Notes |
 |---|---|---|
-| 1 | Project name | Working title *Ferrite* |
+| 1 | Project name | **Decided: Ferrite** (see section 0) |
 | 2 | Repository | New repo; this document moves there |
 | 3 | Rust edition / MSRV | Edition 2024, MSRV policy TBD |
 | 4 | SE ↔ CPC wire protocol | gRPC vs. custom over Unix socket |
