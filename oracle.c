@@ -165,6 +165,8 @@ static int ARCH_DEP( oracle_set_state )( REGS* regs, BYTE* b )
         return rc;
 
     SET_IC_MASK( regs );
+    /* PER controls from CR9-11, as LOAD CONTROL derives them */
+    SET_IC_PER( regs );
     TEST_SET_AEA_MODE( regs );
     ARCH_DEP( oracle_purge )( regs );
     return 0;
