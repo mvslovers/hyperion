@@ -2255,6 +2255,13 @@ void ARCH_DEP( process_trace )( REGS* regs, BYTE* dest )
             hostregs->stepwait = 0;
             sysblk.started_mask |= hostregs->cpubit;
 
+            /* Interruptions made pending while the CPU was not in the
+               started mask (an I/O interruption queued between two
+               oracle steps) are not in its own state: take them over,
+               as a CPU leaving the stopped state does */
+            hostregs->ints_state |= sysblk.ints_state;
+            ON_IC_INTERRUPT( hostregs );
+
             set_cpu_timer( regs,     saved_timer[0] );
             set_cpu_timer( hostregs, saved_timer[1] );
 
