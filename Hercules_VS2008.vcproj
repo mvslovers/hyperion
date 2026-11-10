@@ -4978,6 +4978,10 @@
 							>
 						</File>
 						<File
+							RelativePath=".\tests\kdsa.tst"
+							>
+						</File>
+						<File
 							RelativePath=".\tests\kimd-hw.tst"
 							>
 						</File>
