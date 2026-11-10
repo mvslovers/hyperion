@@ -4990,6 +4990,10 @@
 							>
 						</File>
 						<File
+							RelativePath=".\tests\kma.tst"
+							>
+						</File>
+						<File
 							RelativePath=".\tests\kmac-hw.tst"
 							>
 						</File>
