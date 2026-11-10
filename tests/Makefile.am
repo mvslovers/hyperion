@@ -516,6 +516,7 @@ EXTRA_DIST =                    \
      semipriv.core              \
      semipriv.list              \
      semipriv.tst               \
+     sha3.tst                   \
      ShiftLeft.asm              \
      ShiftLeft.core             \
      ShiftLeft.list             \
